@@ -14,6 +14,10 @@ with st.sidebar:
             num_chunks = process_pdf(uploaded_file)
             st.success(f"Indexed {num_chunks} text chunks into ChromaDB!")
 
+    st.header("Ollama Settings")
+    selected_model = st.text_input("Ollama Model Name", value="llama3.2")
+
+
 # main question input
 user_query = st.text_input("Ask a question about your document:")
 
@@ -30,7 +34,7 @@ if user_query:
         )
 
         # 2. Prompt LLM with grounded context
-        prompt = f"""
+        system_prompt = f"""
         Answer the question using ONLY the provided context below. 
         If the answer is not in the context, state "Information not found in document.
         Do NOT hallucinate answers.
@@ -43,15 +47,26 @@ if user_query:
         Answer:
         """
 
-        response = ollama.generate(model="llama3.2", prompt=prompt)
+        try:
+            response = ollama.generate(
+                model=selected_model,
+                prompt=system_prompt,
+                options={
+                    "temperature": 0.2
+                }
+            )
 
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.subheader("Answer")
-            st.write(response["response"])
 
-        with col2:
-            st.subheader("Retrieved Sources & Citations")
-            for doc, meta in zip(retrieved_chunks, metadatas):
-                with st.expander(f"Page {meta['page']} Citation"):
-                    st.write(doc)
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.subheader("Answer")
+                st.write(response["response"])
+
+            with col2:
+                st.subheader("Retrieved Citations")
+                for doc, meta in zip(retrieved_chunks, metadatas):
+                    with st.expander(f"Page {meta['page']} Source"):
+                        st.write(doc)
+
+        except Exception as e:
+            st.error(f"Failed to connect to Ollama. Make sure Ollama is running locally! Error: {e}")
